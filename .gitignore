@@ -1,0 +1,7 @@
+# Envinronment
+*.env*
+!.env*example
+
+# Resources
+config
+downloads
