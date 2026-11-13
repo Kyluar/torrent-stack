@@ -36,6 +36,12 @@ services:
     tmpfs:
       - /tmp:size=256M,mode=1777
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8191/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   qbittorrent:
       image: lscr.io/linuxserver/qbittorrent:5.3.0
