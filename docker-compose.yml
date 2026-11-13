@@ -64,3 +64,39 @@ services:
       depends_on:
         jackett:
           condition: service_healthy
+    
+  bazarr:
+    image: ghcr.io/lavx/bazarr:2.7.2
+    container_name: bazarr
+    restart: unless-stopped
+    ports:
+      - 6767:6767
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_PATH}/bazarr:/config
+      # Placeholder only: these media mounts are meant for setups that pair
+      # Bazarr+ with Sonarr/Radarr/Sportarr, which this stack does not run.
+      # Without a media library, Bazarr+ still works standalone via Discover.
+      # - /path/to/movies:/movies
+      # - /path/to/tv:/tv
+      # - /path/to/sports:/sports
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "port=$$(cat /tmp/bazarr-supervisor.port 2>/dev/null || echo 6767); case \"$$port\" in \"\"|*[!0-9]*) exit 1 ;; esac; curl -sf \"http://localhost:$$port/_supervisor/status\" | grep -q '\"running\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

@@ -6,7 +6,7 @@
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](#pré-requisitos)
 
-Uma stack auto-hospedada de busca e download de torrents: **qBittorrent** para baixar, **Jackett** como proxy de indexers e **FlareSolverr** para passar por indexers protegidos pelo Cloudflare — tudo orquestrado com Docker Compose.
+Uma stack auto-hospedada de busca e download de torrents: **qBittorrent** para baixar, **Jackett** como proxy de indexers, **FlareSolverr** para passar por indexers protegidos pelo Cloudflare e **Bazarr+** para legendas — tudo orquestrado com Docker Compose.
 
 ## Visão geral
 
@@ -15,8 +15,9 @@ Este repositório empacota um setup pequeno e reproduzível:
 - **qBittorrent** — cliente de torrent com interface web, onde você busca e baixa.
 - **Jackett** — traduz consultas para diversos indexers e expõe uma única API de busca.
 - **FlareSolverr** — proxy que resolve desafios do Cloudflare para os indexers que precisam.
+- **Bazarr+** — gerenciador de legendas para filmes, séries e esportes. Funciona sozinho, sem nenhuma biblioteca de mídia conectada.
 
-Depois de configurado, você busca na aba **Search** do qBittorrent e os resultados vêm do Jackett.
+Depois de configurado, você busca na aba **Search** do qBittorrent e os resultados vêm do Jackett. O Bazarr+ roda de forma independente desse fluxo: a página **Discover** busca qualquer título e baixa legendas para ele.
 
 ## Pré-requisitos
 
@@ -24,7 +25,7 @@ Depois de configurado, você busca na aba **Search** do qBittorrent e os resulta
 - **Git** para clonar o repositório.
 - **GNU Make** (`make --version`).
 - **Bash** — o `make jackett` executa um script bash.
-- Portas livres no host: `8080`, `6881` TCP, `6881` UDP e `9117`.
+- Portas livres no host: `8080`, `6881` TCP, `6881` UDP, `6767` e `9117`.
 - No **Windows**, use **WSL2** (com a integração do Docker Desktop) e clone o repositório dentro do filesystem do WSL.
 
 > **Dica WSL2:** rodar a stack a partir de `/mnt/c/...` funciona, mas o I/O de arquivos e os bind mounts ficam mais lentos. Prefira um caminho dentro do WSL, como `~/torrent-stack`, e garanta que `PUID`/`PGID` correspondam ao seu usuário do WSL (`id -u`, `id -g`).
@@ -98,6 +99,14 @@ Rode isso depois de instalar o plugin do passo 4 e depois que o Jackett tiver su
 
 No qBittorrent, abra **Search**, digite uma consulta e escolha um indexer. Os resultados devem aparecer.
 
+### 8. Encontre legendas com o Bazarr+
+
+Abra <http://localhost:6767>. O Bazarr+ funciona sem nenhuma biblioteca conectada: **Discover** é a página inicial, onde você busca qualquer filme ou série por título ou IMDb ID, visualiza as legendas disponíveis e baixa uma. Os metadados vêm do TMDB por meio de uma chave embutida, então não há nada para configurar antes.
+
+Se você já roda Sonarr, Radarr ou Sportarr em outro lugar, conecte-o em **Settings → Connections** para automatizar as legendas dessa biblioteca. Esses aplicativos não fazem parte desta stack, então o Bazarr+ só gerencia a mídia que eles já acompanham.
+
+O Bazarr+ guarda os dados em `$CONFIG_PATH/bazarr` (padrão: `./config/bazarr`), separados das pastas do Jackett e do qBittorrent.
+
 ## Configuração
 
 Todas as variáveis ficam no `.env`:
@@ -120,6 +129,8 @@ Todas as variáveis ficam no `.env`:
 
 Depois de editar o `.env`, rode `make up` novamente para que o Compose recrie os containers com os novos valores. O `make restart` apenas reinicia os containers existentes e **não** aplica mudanças do `.env`.
 
+O Bazarr+ não precisa de variáveis próprias: ele reutiliza `PUID`, `PGID`, `TZ` e `CONFIG_PATH`, e mantém os arquivos em `$CONFIG_PATH/bazarr` para não se misturarem com os dados dos outros serviços.
+
 O `make jackett` resolve o `CONFIG_PATH` da mesma forma que o Compose, então funciona tanto com o diretório padrão quanto com um diretório personalizado.
 
 `DOWNLOADS_PATH` é um **caminho do host**, não um volume Docker. Para bibliotecas reais, prefira um caminho absoluto em disco rápido, como `/mnt/d/downloads` ou um caminho nativo do WSL como `/home/<usuario>/downloads`. Manter downloads grandes dentro do repositório infla a pasta do projeto, e no WSL2 o mount `/mnt/c` é bem mais lento que o filesystem Linux. Alterar esse valor não move os arquivos existentes; como o caminho no container continua sendo `/downloads`, o caminho de salvamento interno do qBittorrent não precisa mudar.
@@ -133,11 +144,12 @@ O `make jackett` resolve o `CONFIG_PATH` da mesma forma que o Compose, então fu
 - **Não exponha a porta `9117` do Jackett diretamente à internet.** Se precisar de acesso remoto, coloque-o atrás de um reverse proxy com autenticação.
 - **Trate a API key do Jackett como segredo.** Ela dá acesso às suas buscas nos indexers.
 - **Só exponha a porta de torrenting `6881` se entender as implicações.** Ela é usada para conexões de entrada de peers e pode precisar de port forwarding no roteador para uma boa conectividade, mas também revela seu IP a outros peers.
+- **Proteja o Bazarr+ se for expô-lo.** A porta `6767` é publicada por conveniência; coloque-o atrás de um reverse proxy com autenticação e TLS antes de torná-lo acessível pela internet.
 - **Baixe e compartilhe apenas conteúdo que você tem o direito de usar.** Você é responsável pelo uso desta stack e pelas leis da sua jurisdição.
 
 ## Aviso legal
 
-Este projeto é um setup independente e não oficial. Ele **não é afiliado, endossado ou patrocinado** pelo qBittorrent, Jackett, FlareSolverr ou por qualquer indexer ou tracker.
+Este projeto é um setup independente e não oficial. Ele **não é afiliado, endossado ou patrocinado** pelo qBittorrent, Jackett, FlareSolverr, Bazarr+ ou por qualquer indexer ou tracker.
 
 O software é fornecido **"como está"**, sem garantia de qualquer tipo, conforme a [Licença MIT](LICENSE). Você usa esta stack **por sua conta e risco** e é o único responsável por como a configura e a utiliza.
 
@@ -167,3 +179,5 @@ O `make clean` **não** apaga seus arquivos baixados nem a configuração, porqu
 - <https://hub.docker.com/r/linuxserver/qbittorrent#application-setup>
 - <https://github.com/qbittorrent/search-plugins/wiki/How-to-configure-Jackett-plugin>
 - <https://github.com/jackett/jackett#configuring-flaresolverr>
+- <https://github.com/LavX/bazarr#what-is-bazarr>
+- <https://lavx.github.io/bazarr/guides/getting-started.html>
