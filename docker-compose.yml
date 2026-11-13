@@ -15,7 +15,7 @@ services:
       - 9117:9117
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9117/"]
+      test: ["CMD", "curl", "-f", "http://localhost:9117/health"]
       interval: 30s
       timeout: 10s
       retries: 5
